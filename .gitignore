@@ -1,0 +1,11 @@
+db_config.txt
+.venv
+__pycache__/
+.ipynb_checkpoints
+.DS_Store
+.vscode/
+data/cv_reports/**/202*
+data/cv_reports/**/202*/**/*.csv
+data/cv_reports/**/202*/**/*.parquet
+data/processed/
+logs/
