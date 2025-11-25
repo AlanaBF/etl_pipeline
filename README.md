@@ -1,182 +1,51 @@
-# Smart-Assign
+# Flowcase ETL
 
-## Overview
+Production-style ETL for Flowcase CV Partner reports: extract the latest `Q####` export, transform to a relational schema, load into Postgres, refresh the search view, and log KPIs.
 
-Smart-Assign is a small ETL demo for the Smart Assign MVP. It:
+## Required environment variables
 
-1. Generates **synthetic CV Partner–style reports** (Flowcase exports)
-2. **Extracts** raw CSV files from the latest export folder
-3. **Transforms** them into a clean, relational schema
-4. **Loads** them into PostgreSQL
-5. Runs a few **sanity checks** to prove the pipeline works end-to-end
+- `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD`
 
-The whole flow is implemented in a single, step-by-step Jupyter notebook:
+## How to run (from repo root)
 
-- `data_engineering_ETL_pipeline.ipynb`
+```bash
+# Generate fake reports then run ETL
+PYTHONPATH=flowcase_etl/src python -m flowcase_etl.cli --generate-fake
 
-and a set of SQL schema files:
-
-- `sql/*.sql`
-
----
-
-## Prerequisites
-
-- **Python**: 3.11+ (virtual environment strongly recommended)
-- **PostgreSQL**: 14+ running locally  
-  - A user with permission to `CREATE DATABASE`
-- **Client tools** (optional, but useful):
-  - `psql` or **pgAdmin** for ad-hoc queries
-
----
-
-## Setup Instructions
-
-1. **Clone the repository**
-
-   ```bash
-   git clone <your-repo-url>
-   cd smart-assign
-   ```
-
-2. **Create & activate a virtual environment**
-
-   ```bash
-    python3 -m venv .venv
-    source .venv/bin/activate
-    # On Windows:
-    # .venv\Scripts\activate
-    ```
-
-3. **Install dependencies**
-
-    ```bash
-    pip install -r requirements.txt
-    ```
-
-4. **Configure database**
-
-    Create a db_config.txt file in the project root:
-
-    ```text
-    host=localhost
-    port=5432
-    database=cv_demo
-    user=postgres
-    password=postgres
-    ```
-
-## Running the ETL Notebook
-
-The main end-to-end flow lives in:
-
-- **`data_engineering_ETL_pipeline.ipynb`**
-
-The notebook is structured as a clear, narrative walkthrough and includes small tests throughout.
-
----
-
-### 1. Open the notebook
-
-- Open the notebook in **VS Code**, **JupyterLab**, or your preferred environment.
-- Select the **Python kernel** associated with your `.venv`.
-
----
-
-### 2. Run the cells in order
-
-The notebook is organised into the following sections:
-
----
-
-### **Environment Setup**
-
-Initial imports and utility functions.
-
----
-
-### **Step 0 — Generate Synthetic Data**
-
-- Calls `make_fake_flowcase_reports.main()`
-- Generates timestamped folders under `cv_reports/`
-
----
-
-### **Step 1 — Extract**
-
-- Locates the **latest** report folder
-- Loads all CSVs into pandas DataFrames
-- Performs small sanity checks (e.g., ensure `user_report.csv` exists)
-
----
-
-### **Step 2 — Transform**
-
-- Builds clean tables:  
-  `users_df`, `cvs_df`, skills, languages, experiences, etc.
-- Normalises multilang fields and date formats
-- Runs basic integrity checks:
-  - `users_df` is not empty
-  - `"CV Partner User ID"` exists and has non-null values
-  - `len(users_df) == len(cvs_df)` (1 user ↔ 1 CV)
-
----
-
-### **Step 3 — Load**
-
-Upserts into PostgreSQL tables:
-
-- `users`, `cvs`
-- `dim_technology`, `cv_technology`
-- `cv_language`, `project_experience`, `work_experience`
-- `education`, `course`, `position`, `blog_publication`
-- `cv_role`, `key_qualification`
-- `dim_clearance`, `user_clearance`, `user_availability`
-
-All load steps run inside a **single transaction** via:
-
-```python
-load(tr, engine)
+# Use existing real reports under cv_reports/Q#### (no fake generation)
+PYTHONPATH=flowcase_etl/src python -m flowcase_etl.cli
 ```
 
-### Step 4 — Database Setup
+## CLI flags
 
-The notebook prepares the PostgreSQL environment before loading data:
+- `--generate-fake` : run the synthetic report generator first
+- `--data-folder`   : override reports folder (default: repo_root/cv_reports)
+- `--sql-folder`    : override SQL folder (default: flowcase_etl/src/sql)
+- `--skip-refresh`  : skip refreshing the materialized view
 
-- Builds database settings using **`compose_settings()`**
-- Ensures the target database exists with **`ensure_database_exists()`**
-- Applies all SQL schema files from `sql/*.sql` using  
-  **`setup_database_schema_if_needed()`**
+## What it does
 
----
+1. (Optional) Generate fake Flowcase-style reports into `cv_reports/Q####`.
+2. Apply schema from `src/sql/*.sql` (idempotent).
+3. Extract latest quarterly folder, transform, load with upserts.
+4. Refresh `cv_search_profile_mv` (best-effort).
+5. Log KPIs: users, CVs, top skills, SC-cleared availability, average availability.
 
-### Step 5 — Run Full ETL Pipeline
+## Folder guide
 
-This final stage executes the complete workflow:
+- `flowcase_etl/src/flowcase_etl/` : package code (config, db, extract, transform, load, cli)
+- `flowcase_etl/src/sql/`          : schema and materialized view
+- `flowcase_etl/src/tests/`        : unit/integration tests (start here: extract/transform tests)
+- `experiments/`                   : notebook + generator for exploration (not used by production package)
 
-- Runs **Extract → Transform → Load** in sequence  
-- Prints a success message when the ETL completes successfully  
-- (Optional) You can manually verify key tables using SQL, for example:
+## Scheduling
 
-  ```sql
-  SELECT COUNT(*) FROM users;
-  SELECT COUNT(*) FROM cvs;
-  SELECT COUNT(*) FROM cv_technology;
-  ```
+- Manual: drop the latest `Q####` export into `cv_reports/` and run the CLI.
+- Cron example:  
+  `0 6 1 * * PYTHONPATH=/path/to/flowcase_etl/src /path/to/.venv/bin/python -m flowcase_etl.cli >> etl.log 2>&1`
+- Airflow: call `python -m flowcase_etl.cli` from a BashOperator/PythonOperator; ensure env vars are set on the worker.
 
-### Re-running the Notebook
+## Notes
 
-You can safely run the entire notebook multiple times:
-
-- New synthetic data is generated on each run  
-- The database is fully reloaded  
-- All loads use **upserts**, ensuring idempotency (no duplication)
-
-This makes the pipeline ideal for:
-
-- Demonstrations  
-- Debugging  
-- Development iteration  
-- Repeated testing with fresh datasets  
-
-No manual cleanup is required between runs.
+- Real Flowcase exports can replace the fake data directly (same filenames/columns).
+- Keep `.env`/secrets out of git; use env vars for Postgres credentials.
