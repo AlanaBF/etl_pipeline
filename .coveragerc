@@ -1,0 +1,4 @@
+[run]
+omit =
+    flowcase_etl/make_fake_flowcase_reports.py
+    flowcase_etl/src/tests/*

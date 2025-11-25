@@ -1,0 +1,8 @@
+pandas
+requests
+sqlalchemy
+psycopg2-binary
+apache-airflow
+faker
+PyYAML
+python-dotenv
