@@ -2,20 +2,16 @@
 Command-line entrypoint for the Flowcase ETL.
 
 Steps:
-1) Generate fake Flowcase-style reports
-2) Ensure the database exists and schema is applied
-3) Extract -> Transform -> Load
-4) Refresh the materialized view
-
-Required environment variables for the database:
-  PGHOST, PGPORT, PGDATABASE, PGUSER, PGPASSWORD
+1) (Optional) generate fake Flowcase-style reports (if data_source=fake)
+2) If data_source=real, download CV reports from Flowcase API
+3) Ensure the database exists and schema is applied
+4) Extract -> Transform -> Load
+5) (Optional) refresh the materialized view
 """
 
 import argparse
 import logging
-import os
-import sys
-from contextlib import contextmanager
+from datetime import datetime
 from pathlib import Path
 
 from sqlalchemy import text
@@ -26,35 +22,79 @@ from .extract import extract
 from .load import load
 from .transform import transform
 from . import fake_data
+from .flowcase_client import FlowcaseClient
+
 
 logger = logging.getLogger(__name__)
 
 
-def run_etl(generate_fake: bool, refresh_mv: bool, data_folder: Path | None, sql_folder: Path | None) -> None:
+def run_etl(
+    generate_fake: bool,
+    refresh_mv: bool,
+    data_folder: Path | None,
+    sql_folder: Path | None,
+) -> None:
     settings = Settings.load()
-    if data_folder:
-        settings.base_folder = data_folder
-    if sql_folder:
-        settings.sql_folder = sql_folder
 
-    if generate_fake:
-        try:
-            if generate_fake:
-                fake_data.main()
-            logger.info("Generated fake Flowcase reports.")
-        except Exception as exc:
-            logger.error("Failed to generate fake reports: %s", exc)
-            raise
+    # Decide where the CSVs live and where SQL lives
+    base_data_dir = data_folder if data_folder else settings.cv_reports_dir
+    sql_dir = sql_folder if sql_folder else settings.sql_dir
 
+    # ------------------------------------------------------------------
+    # 1. Acquire data (fake OR real)
+    # ------------------------------------------------------------------
+    if settings.data_source == "real":
+        if settings.flowcase is None:
+            raise RuntimeError(
+                "FLOWCASE_DATA_SOURCE=real but Flowcase config is missing. "
+                "Check FLOWCASE_SUBDOMAIN and FLOWCASE_API_TOKEN in your .env."
+            )
+
+        logger.info("Using REAL Flowcase data source.")
+        client = FlowcaseClient(settings.flowcase)
+
+        # Put each real download in a timestamped subfolder
+        ts = datetime.utcnow().strftime("QREAL_%Y%m%d_%H%M%S")
+        data_dir = base_data_dir / ts
+        logger.info("Downloading Flowcase reports into %s", data_dir)
+
+        client.fetch_all_reports(output_dir=data_dir)
+        extract_base_folder = data_dir
+
+    else:
+        logger.info("Using FAKE data source.")
+        data_dir = base_data_dir
+
+        if generate_fake:
+            logger.info("Generating fake Flowcase reports using make_fake_flowcase_reports.py")
+            fake_data.main()
+        else:
+            logger.info("Re-using existing fake reports in %s", data_dir)
+
+        extract_base_folder = data_dir
+
+    # ------------------------------------------------------------------
+    # 2. DB setup
+    # ------------------------------------------------------------------
     create_database_if_missing(settings.db)
     engine = get_engine(settings.db)
-    apply_sql_folder(engine, settings.sql_folder)
+    apply_sql_folder(engine, sql_dir)
 
-    # ETL
-    extract_result = extract({"data_source": settings.data_source, "base_folder": settings.base_folder})
+    # ------------------------------------------------------------------
+    # 3. ETL: extract -> transform -> load
+    # ------------------------------------------------------------------
+    extract_result = extract(
+        {
+            "data_source": settings.data_source,
+            "base_folder": extract_base_folder,
+        }
+    )
     transform_result = transform(extract_result.frames)
     load(transform_result, engine)
 
+    # ------------------------------------------------------------------
+    # 4. Optional: refresh MV
+    # ------------------------------------------------------------------
     if refresh_mv:
         logger.info("Refreshing materialized view cv_search_profile_mv")
         try:
@@ -63,6 +103,9 @@ def run_etl(generate_fake: bool, refresh_mv: bool, data_folder: Path | None, sql
         except Exception as exc:
             logger.warning("Could not refresh cv_search_profile_mv: %s", exc)
 
+    # ------------------------------------------------------------------
+    # 5. Simple KPIs to prove business value
+    # ------------------------------------------------------------------
     try:
         with engine.connect() as conn:
             users_count = conn.execute(text("SELECT COUNT(*) FROM users")).scalar()
@@ -96,7 +139,7 @@ def run_etl(generate_fake: bool, refresh_mv: bool, data_folder: Path | None, sql
             cvs_count,
             top_skills,
             sc_available,
-            avg_availability or 0,
+            avg_availability or 0.0,
         )
     except Exception as exc:
         logger.warning("Post-load KPI query failed: %s", exc)
@@ -109,7 +152,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--generate-fake",
         action="store_true",
-        help="Generate fake Flowcase reports before running ETL.",
+        help="(FAKE mode only) Generate fake Flowcase reports before running ETL.",
     )
     parser.add_argument(
         "--data-folder",
@@ -130,7 +173,10 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
     parser = build_parser()
     args = parser.parse_args()
     run_etl(
