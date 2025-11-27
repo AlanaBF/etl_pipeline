@@ -146,7 +146,7 @@ Additional:
 
 - drop the latest `Q####` export into `cv_reports/` and run the CLI.
 
-### COMING SOON
+### Automation - COMING SOON
 
 ## Notes
 
