@@ -3,6 +3,30 @@
 A production-style ETL pipeline for processing Flowcase (CV Partner) CSV reports.
 The pipeline extracts the latest quarterly export (Q####), transforms the raw files into a clean relational model, loads them into PostgreSQL, refreshes a materialized search view, and outputs key operational KPIs.
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+## Tech stack
+
+Developed in [![Visual Studio Code](https://custom-icon-badges.demolab.com/badge/Visual%20Studio%20Code-0078d7.svg?logo=vsc&logoColor=white)](#)
+
+Backend: Python 3.10+, SQLAlchemy
+
+[![ETL](https://custom-icon-badges.demolab.com/badge/ETL-9370DB?logo=etl-logo&logoColor=fff)](#)
+[![Python](https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=fff)](#)
+[![Jupyter](https://img.shields.io/badge/Jupyter-ffffff?logo=Jupyter)](#)
+[![Pandas](https://img.shields.io/badge/Pandas-150458?logo=pandas&logoColor=fff)](#)
+
+[![Apache Airflow](https://img.shields.io/badge/Apache%20Airflow-017CEE?logo=apacheairflow&logoColor=fff)](#)
+[![Pytest](https://img.shields.io/badge/Pytest-fff?logo=pytest&logoColor=000)](#)
+
+Database: PostgreSQL (12+)
+
+[![Postgres](https://img.shields.io/badge/Postgres-%23316192.svg?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+
+Dev tooling: npm, node 18+, pip, virtualenv/venv
+
+[![npm](https://img.shields.io/badge/npm-CB3837?logo=npm&logoColor=fff)](https://www.npmjs.com/)
+
 ## Prerequisites
 
 - PostgreSQL (install via Homebrew or Postgres.app)
@@ -41,8 +65,8 @@ PGPASSWORD=mypassword
 FLOWCASE_DATA_SOURCE=real
 FLOWCASE_SUBDOMAIN=your-subdomain
 FLOWCASE_API_TOKEN=your_api_token
-FLOWCASE_OFFICE_IDS=office_ids #comma separated
-FLOWCASE_LANG_PARAMS=int #comma separated
+FLOWCASE_OFFICE_IDS=123,456
+FLOWCASE_LANG_PARAMS=en,fr
 ```
 
 Use a .env file or export variables before running the pipeline.
@@ -159,9 +183,9 @@ Additional:
 
 ## SMART-ASSIGN
 
-========================================
+Smart-Assign is a separate repo that can be run to work alongside the ETL_Pipeline and demonstrates and visualises the ETL database in an Angular UI with Python backend.
 
-The smart-assign frontend is a simple UI that demonstrates and visualises the ETL database.
+========================================
 
 ## Set up and run the application
 
@@ -209,3 +233,18 @@ The backend code reads config.ini via services.db.\_read_config() so ensure the 
 2 Run the development server (opens at [http://localhost:4200](http://localhost:4200) by default):
 
 - `npm start`
+
+## License & contact
+
+- This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+- Questions or access issues: contact the repository owner.
+
+## Questions
+
+Have questions? Get in touch:
+
+- [![Email](https://img.shields.io/badge/Email-alanabarrett--frew%40hotmail.com-0052CC?style=flat&logo=gmail&logoColor=white)](mailto:alanabarrett-frew@hotmail.com)
+
+- [![GitHub](https://img.shields.io/badge/GitHub-@AlanaBF-181717?style=flat&logo=github&logoColor=white)](https://github.com/AlanaBF)
+
+- [![LinkedIn](https://img.shields.io/badge/LinkedIn-Alana%20Barrett%20Frew-0A66C2?style=flat&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/alanabarrettfrew/)
