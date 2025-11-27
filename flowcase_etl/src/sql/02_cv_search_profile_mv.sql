@@ -17,12 +17,12 @@ WITH latest_availability AS (
 SELECT
     u.user_id,
     u.cv_partner_user_id,
-    (u.name_multilang->>'int')       AS user_name,   -- 🔹 rename here
+    (u.name_multilang->>'int')       AS user_name,
     c.cv_id,
     (c.title_multilang->>'int')      AS cv_title,
     c.sfia_level,
     c.cpd_label,
-
+    u.country                AS country,
     STRING_AGG(DISTINCT dt.name, ', ' ORDER BY dt.name) AS technologies,
     MAX(ct.years_experience) AS max_years_experience,
     MAX(dc.name)             AS clearance,
@@ -50,10 +50,11 @@ LEFT JOIN latest_availability la
 GROUP BY
     u.user_id,
     u.cv_partner_user_id,
-    user_name,          -- 🔹 use the alias here
+    user_name,          
     c.cv_id,
     cv_title,
     c.sfia_level,
     c.cpd_label,
+    u.country,
     la.date,
     la.percent_available;
