@@ -47,7 +47,7 @@ On the `Connection` tab:
 - **Maintenance DB:** `postgres` (or `flowcase`)
 - **Username:** `myuser`
 - **Password:** `mypassword`
-Click `Save`. You should now see the server and can expand databases/schemas.
+  Click `Save`. You should now see the server and can expand databases/schemas.
 
 ## Required environment variables
 
@@ -163,6 +163,25 @@ flowcase_etl/
 Additional:
 
 `early_experimentation` — early notebooks and prototypes (not used in production)
+
+## Running Tests
+
+To run all unit and integration tests with coverage and HTML reports, use the following commands from the repository root:
+
+```bash
+# Load test environment variables
+set -a && source flowcase_etl/.env.test && set +a
+
+# Run tests with coverage and reports
+PYTHONPATH=flowcase_etl/src .venv/bin/pytest flowcase_etl/src/tests \
+  --junitxml=reports/junit.xml --html=reports/report.html \
+  --cov=flowcase_etl --cov-report=term-missing \
+  --cov-report=html:reports/coverage_html \
+  --cov-report=xml:reports/coverage.xml
+```
+
+- `.env.test` contains test-specific environment variables.
+- Test results and coverage reports will be saved in the `reports/` directory.
 
 ## Scheduling & Automation
 

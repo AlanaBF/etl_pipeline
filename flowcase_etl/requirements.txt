@@ -6,3 +6,7 @@ apache-airflow
 faker
 PyYAML
 python-dotenv
+pytest
+pytest-cov
+pytest-html
+pytest-mock
