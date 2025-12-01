@@ -1,14 +1,10 @@
 # flowcase_etl_pipeline/flowcase_client.py
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
-
 import time
 import requests
-
 from .config import FlowcaseConfig
 
 REPORT_TYPES: list[str] = [
@@ -37,14 +33,10 @@ class FlowcaseClient:
         return f"https://{self.cfg.subdomain}.flowcase.com"
 
     def _headers(self) -> dict[str, str]:
-        # Adjust to whatever Flowcase actually requires:
-        # could be an Authorization header, cookie, or X-API-Key, etc.
         return {
             "Authorization": f"Bearer {self.cfg.api_token}",
             "Accept": "application/json",
         }
-
-    # -- utilities ---------------------------------------------------------
 
     def fetch_office_ids(self) -> list[str]:
         """
@@ -67,8 +59,6 @@ class FlowcaseClient:
                     office_ids.append(office_id)
         return office_ids
 
-    # -- report lifecycle --------------------------------------------------
-
     def initiate_report(
         self,
         report_type: str,
@@ -84,17 +74,14 @@ class FlowcaseClient:
             "report_type": report_type,
         }
 
-        # optional language codes: &lang[]=no&lang[]=int...
         if self.cfg.lang_params:
             for lang in self.cfg.lang_params:
-                # requests will expand this to repeated params
                 params.setdefault("lang[]", []).append(lang)
 
         payload = {
             "office_ids": list(office_ids),
             "must": must or [],
         }
-
         url = f"{self.base_url}/api/v2/cv-report"
         r = requests.post(url, params=params, json=payload,
                           headers=self._headers(), timeout=30)
@@ -144,8 +131,6 @@ class FlowcaseClient:
 
         dest_path.parent.mkdir(parents=True, exist_ok=True)
         dest_path.write_bytes(r.content)
-
-    # -- orchestration -----------------------------------------------------
 
     def fetch_all_reports(
         self,
