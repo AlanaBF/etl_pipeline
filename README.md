@@ -61,8 +61,9 @@ PGDATABASE=flowcase
 PGUSER=myuser
 PGPASSWORD=mypassword
 
+FLOWCASE_DATA_SOURCE=fake 
 # optional (real Flowcase API mode)
-FLOWCASE_DATA_SOURCE=real
+# FLOWCASE_DATA_SOURCE=real
 FLOWCASE_SUBDOMAIN=your-subdomain
 FLOWCASE_API_TOKEN=your_api_token
 FLOWCASE_OFFICE_IDS=123,456
@@ -82,18 +83,26 @@ cd /path/to/repo_root
 # create a virtual environment
 python3 -m venv .venv
 
+# or `python -m venv .venv` on windows
+
 # activate (bash)
 source .venv/bin/activate
+# or `.venv\Scripts\activate` on windows
 
 # upgrade pip and install project dependencies
-pip install --upgrade pip
-pip install -r flowcase_etl/requirements.txt
+pip install --upgrade pip # or `python -m pip install --upgrade pip` on windows
+pip install -r etl_pipeline/flowcase_etl/requirements.txt #or pip install -r etl_pipeline/flowcase_etl/requirements.txt` on windows
 
 # verify dependency integrity
 pip check
 
 # run the ETL in fake-data mode (creates Q#### CSVs and runs pipeline)
 PYTHONPATH=flowcase_etl/src python -m flowcase_etl_pipeline.cli --generate-fake
+
+# on windows
+# `cd etl_pipeline`
+# `set PYTHONPATH=flowcase_etl/src`
+# `python -m flowcase_etl_pipeline.cli --generate-fake`
 
 # when finished, deactivate the venv
 deactivate
