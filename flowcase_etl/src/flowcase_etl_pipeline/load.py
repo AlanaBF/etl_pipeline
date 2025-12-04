@@ -104,9 +104,10 @@ def upsert_users(conn, df: pd.DataFrame):
             nationality_multilang = EXCLUDED.nationality_multilang
     """
     )
+    
+    payload = []
     for _, row in df.iterrows():
-        conn.execute(
-            sql,
+        payload.append(
             {
                 "cv_partner_user_id": str(row["CV Partner User ID"]),
                 "name_multilang": json.dumps(row["Name (multilang)"]),
@@ -122,6 +123,8 @@ def upsert_users(conn, df: pd.DataFrame):
                 "nationality_multilang": json.dumps(row.get("nationality_multilang", {})),
             },
         )
+    if payload:
+        conn.execute(sql, payload)
 
 
 def upsert_cvs(conn, df: pd.DataFrame):
@@ -155,6 +158,7 @@ def upsert_cvs(conn, df: pd.DataFrame):
             cpd_label  = EXCLUDED.cpd_label
     """
     )
+    payload = []
     for _, row in df.iterrows():
         uid = conn.execute(
             text("SELECT user_id FROM users WHERE cv_partner_user_id=:uid"),
@@ -164,8 +168,7 @@ def upsert_cvs(conn, df: pd.DataFrame):
             logger.warning(f"Skipping CV {row['CV Partner CV ID']} (unknown user {row['CV Partner User ID']})")
             continue
 
-        conn.execute(
-            sql,
+        payload.append(
             {
                 "cv_partner_cv_id": str(row["CV Partner CV ID"]),
                 "user_id": uid,
@@ -183,55 +186,83 @@ def upsert_cvs(conn, df: pd.DataFrame):
                 "cpd_label": None if pd.isna(row.get("cpd_label")) else str(row.get("cpd_label")),
             },
         )
+    if payload:
+        conn.execute(sql, payload)
 
 
 def upsert_technologies(conn, df: pd.DataFrame):
     if df is None or df.empty:
         return
     logger.info(f"Upserting {len(df)} technologies...")
+    
+    
+    insert_dim_sql = text(
+        """
+        INSERT INTO dim_technology (name)
+        VALUES (:name)
+        ON CONFLICT (name) DO NOTHING
+        """
+    )
+
+    insert_link_sql = text(
+        """
+        INSERT INTO cv_technology (
+            cv_id,
+            technology_id,
+            years_experience,
+            proficiency,
+            is_official_masterdata
+        )
+        VALUES (
+            :cv,
+            :tech,
+            :yexp,
+            :prof,
+            CAST(:is_md AS JSONB)
+        )
+        ON CONFLICT (cv_id, technology_id) DO UPDATE
+        SET years_experience      = EXCLUDED.years_experience,
+            proficiency           = EXCLUDED.proficiency,
+            is_official_masterdata = EXCLUDED.is_official_masterdata
+        """
+    )
+    link_payload = []
+
     for _, row in df.iterrows():
         tech_name = row["Skill name"]
-        conn.execute(
-            text(
-                """
-            INSERT INTO dim_technology (name)
-            VALUES (:name)
-            ON CONFLICT (name) DO NOTHING
-        """
-            ),
-            {"name": tech_name},
-        )
 
-        tech_id = conn.execute(text("SELECT technology_id FROM dim_technology WHERE name=:n"), {"n": tech_name}).scalar()
+        conn.execute(insert_dim_sql, {"name": tech_name})
+
+        tech_id = conn.execute(
+            text("SELECT technology_id FROM dim_technology WHERE name = :n"),
+            {"n": tech_name},
+        ).scalar()
+
         if tech_id is None:
             logger.warning(f"Skipping tech link; cannot resolve technology '{tech_name}'")
             continue
 
-        cv_id = conn.execute(text("SELECT cv_id FROM cvs WHERE cv_partner_cv_id=:cid"), {"cid": str(row["CV Partner CV ID"])}).scalar()
+        cv_id = conn.execute(
+            text("SELECT cv_id FROM cvs WHERE cv_partner_cv_id = :cid"),
+            {"cid": str(row["CV Partner CV ID"])},
+        ).scalar()
+
         if cv_id is None:
             logger.warning(f"Skipping tech link; unknown CV {row['CV Partner CV ID']}")
             continue
 
-        conn.execute(
-            text(
-                """
-            INSERT INTO cv_technology (cv_id, technology_id, years_experience, proficiency, is_official_masterdata)
-            VALUES (:cv, :tech, :yexp, :prof, CAST(:is_md AS JSONB))
-            ON CONFLICT (cv_id, technology_id) DO UPDATE
-            SET years_experience = EXCLUDED.years_experience,
-                proficiency = EXCLUDED.proficiency,
-                is_official_masterdata = EXCLUDED.is_official_masterdata
-        """
-            ),
+        link_payload.append(
             {
                 "cv": cv_id,
                 "tech": tech_id,
                 "yexp": int(row["Year experience"]) if pd.notna(row["Year experience"]) else None,
                 "prof": int(row["Proficiency (0-5)"]) if pd.notna(row["Proficiency (0-5)"]) else None,
                 "is_md": json.dumps(row["Is official masterdata (in #{lang})"]),
-            },
+            }
         )
 
+    if link_payload:
+        conn.execute(insert_link_sql, link_payload)
 
 def upsert_languages(conn, df: pd.DataFrame):
     if df is None or df.empty:
@@ -251,13 +282,13 @@ def upsert_languages(conn, df: pd.DataFrame):
             updated_by_owner = EXCLUDED.updated_by_owner
     """
     )
+    payload = []
     for _, row in df.iterrows():
         cv_id = _cv_id(conn, row["CV Partner CV ID"])
         if not cv_id:
             continue
         lang_id = _ensure_dim(conn, "dim_language", row.get("Language"))
-        conn.execute(
-            sql,
+        payload.append(
             {
                 "cv_id": cv_id,
                 "lang_id": lang_id,
@@ -268,6 +299,8 @@ def upsert_languages(conn, df: pd.DataFrame):
                 "updated_by_owner": row.get("Updated by owner"),
             },
         )
+    if payload:
+        conn.execute(sql, payload)
 
 
 def upsert_project_experiences(conn, df: pd.DataFrame):
@@ -318,12 +351,12 @@ def upsert_project_experiences(conn, df: pd.DataFrame):
           updated_by_owner = EXCLUDED.updated_by_owner
     """
     )
+    payload = []
     for _, row in df.iterrows():
         cv_id = _cv_id(conn, row["CV Partner CV ID"])
         if not cv_id:
             continue
-        conn.execute(
-            sql,
+        payload.append(
             {
                 "cv_id": cv_id,
                 "sid": row.get("CV Partner section ID"),
@@ -357,6 +390,8 @@ def upsert_project_experiences(conn, df: pd.DataFrame):
                 "updated_by_owner": row.get("Updated by owner"),
             },
         )
+    if payload:
+        conn.execute(sql, payload)
 
 
 def upsert_section_table(conn, df: pd.DataFrame, table: str, fields: dict):
@@ -559,6 +594,7 @@ def upsert_sc_clearance(conn, df: pd.DataFrame):
             notes       = EXCLUDED.notes
     """
     )
+    payload = []
     for _, row in df.iterrows():
         uid = _resolve_user_id(conn, row.get("Email"), row.get("UPN"), row.get("External User ID"))
         if not uid:
@@ -578,8 +614,7 @@ def upsert_sc_clearance(conn, df: pd.DataFrame):
         if valid_to_date and valid_from_date and valid_to_date < valid_from_date:
             valid_to_date = None
 
-        conn.execute(
-            sql,
+        payload.append(
             {
                 "user_id": uid,
                 "clearance_id": clearance_id,
@@ -589,6 +624,8 @@ def upsert_sc_clearance(conn, df: pd.DataFrame):
                 "notes": notes,
             },
         )
+    if payload:
+        conn.execute(sql, payload)
 
 
 def upsert_availability(conn, df: pd.DataFrame):
@@ -605,6 +642,7 @@ def upsert_availability(conn, df: pd.DataFrame):
             updated_at        = NOW()
     """
     )
+    payload = []
     for _, row in df.iterrows():
         uid = _resolve_user_id(conn, row.get("Email"), row.get("UPN"), row.get("External User ID"))
         if not uid:
@@ -612,8 +650,7 @@ def upsert_availability(conn, df: pd.DataFrame):
         raw_percent = row.get("Percent Available")
         percent = 0 if raw_percent is None or (isinstance(raw_percent, float) and pd.isna(raw_percent)) else int(float(raw_percent))
         percent = max(0, min(100, percent))
-        conn.execute(
-            sql,
+        payload.append(
             {
                 "user_id": uid,
                 "date": _clean_str(row.get("Date"), None) or None,
@@ -621,6 +658,8 @@ def upsert_availability(conn, df: pd.DataFrame):
                 "source": _clean_str(row.get("Source"), "Fake generator"),
             },
         )
+    if payload:
+        conn.execute(sql, payload)
 
 
 # ---------- Orchestrator ----------
