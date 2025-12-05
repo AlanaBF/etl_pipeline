@@ -12,7 +12,8 @@ from flowcase_etl_pipeline.load import load
 
 @pytest.mark.integration
 def test_etl_end_to_end_with_qtest(tmp_path):
-    env_test_path = Path(__file__).parent.parent.parent / ".env.test"
+    # Load .env.test from flowcase_etl directory, not from repository root
+    env_test_path = Path(__file__).parent.parent.parent.parent / ".env.test"
     load_dotenv(env_test_path)
     
     with patch("flowcase_etl_pipeline.extract.find_latest_quarterly_report_folder") as mock_find:
@@ -22,6 +23,15 @@ def test_etl_end_to_end_with_qtest(tmp_path):
             cfg = DbConfig.from_env()
         except ValueError as exc:
             pytest.skip(f"Integration test skipped: {exc}")
+        
+        # SAFETY CHECK: Only allow localhost for integration tests
+        if cfg.host != 'localhost':
+            pytest.skip(f"Integration test skipped: Host is '{cfg.host}' instead of 'localhost'. This prevents accidental production database usage.")
+        
+        # SAFETY CHECK: Ensure we're using a test database
+        if not (cfg.database.endswith('_test') or cfg.database.startswith('test_')):
+            pytest.skip(f"Integration test skipped: Database is '{cfg.database}' instead of ending with '_test' or starting with 'test_'. This prevents accidental production database usage.")
+            
         create_database_if_missing(cfg)
         engine = create_engine(
             f"postgresql+psycopg2://{cfg.user}:{cfg.password}@{cfg.host}:{cfg.port}/{cfg.database}"
