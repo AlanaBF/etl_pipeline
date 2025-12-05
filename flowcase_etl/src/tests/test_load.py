@@ -61,7 +61,7 @@ def test_resolve_user_id_prefers_email_then_upn_then_external():
 
 def test_ensure_dim_returns_none_for_blank_and_inserts_when_present():
     conn = ConnWithMapping({"SELECT industry_id": 9})
-    assert load_mod._ensure_dim(conn, "dim_industry", None) is None  # short-circuits
+    assert load_mod._ensure_dim(conn, "dim_industry", None) is None  
     value = load_mod._ensure_dim(conn, "dim_industry", "Energy")
     assert value == 9
 
@@ -90,7 +90,6 @@ def test_upsert_cvs_inserts_when_user_found():
         }
     )
     load_mod.upsert_cvs(conn, df)
-    # one insert call after the select
     assert len(conn.calls) >= 2
 
 
@@ -99,7 +98,6 @@ def test_upsert_technologies_skips_unknown_cv_and_inserts_known():
 
     class ConnToggle(ConnWithMapping):
         def execute(self, sql, params=None):
-            # when we see params for cv-present, update mapping so subsequent call returns a cv_id
             if params and "cv-present" in str(params):
                 self.mapping["SELECT cv_id FROM cvs"] = 5
             return super().execute(sql, params)
@@ -115,7 +113,6 @@ def test_upsert_technologies_skips_unknown_cv_and_inserts_known():
         }
     )
     load_mod.upsert_technologies(conn, df)
-    # at least one insert into cv_technology should occur when cv_id becomes 5
     assert any("cv_technology" in call[0] for call in conn.calls if isinstance(call, tuple))
 
 
@@ -128,16 +125,13 @@ def test_upsert_courses_skips_when_cv_missing(monkeypatch):
 
 
 def test_upsert_sc_clearance_handles_empty_and_missing_user(monkeypatch):
-    # empty -> immediate return
     conn = FakeConn()
     load_mod.upsert_sc_clearance(conn, pd.DataFrame())
     assert conn.calls == []
 
-    # missing user_id -> continue branch
     monkeypatch.setattr(load_mod, "_resolve_user_id", lambda conn, email, upn, external_id: None)
     df = pd.DataFrame({"Email": ["a@example.com"], "Clearance": ["SC"]})
     load_mod.upsert_sc_clearance(conn, df)
-    # still no writes because user not found
     assert conn.calls == []
 
 
@@ -153,7 +147,6 @@ def test_upsert_availability_handles_empty_and_missing_user(monkeypatch):
 
 
 def test_upsert_section_table_inserts_when_cv_id_present(monkeypatch):
-    # Force _cv_id to return a value for one row and None for another to ensure skip works
     def fake_cv_id(conn, cv_partner_cv_id):
         return 123 if cv_partner_cv_id != "skip" else None
 
@@ -174,9 +167,8 @@ def test_upsert_section_table_inserts_when_cv_id_present(monkeypatch):
     conn = FakeConn()
     load_mod.upsert_section_table(conn, df, "work_experience", fields)
 
-    # Only one row should be sent to execute because one cv_id was None
     assert len(conn.calls) == 1
-    params = conn.calls[0][0]  # payload list, take first dict
+    params = conn.calls[0][0]  
     assert params["cv_id"] == 123
     assert params["cv_partner_section_id"] == "s1"
 
@@ -191,7 +183,11 @@ def test_upsert_users_executes_rows():
     )
     conn = FakeConn()
     load_mod.upsert_users(conn, df)
-    assert len(conn.calls) == 2
+    assert len(conn.calls) == 1
+    batch = conn.calls[0]
+    assert len(batch) == 2  
+    assert batch[0]["cv_partner_user_id"] == "1"
+    assert batch[1]["cv_partner_user_id"] == "2"
 
 
 def test_upsert_courses_json_field(monkeypatch):
@@ -219,7 +215,6 @@ def test_upsert_courses_json_field(monkeypatch):
     )
     conn = FakeConn()
     load_mod.upsert_courses(conn, df)
-    # One execute call with a payload list containing one dict
     assert len(conn.calls) == 1
     payload_list = conn.calls[0]
     assert isinstance(payload_list, list)
@@ -246,7 +241,9 @@ def test_upsert_languages_inserts(monkeypatch):
     conn = FakeConn()
     load_mod.upsert_languages(conn, df)
     assert len(conn.calls) == 1
-    payload = conn.calls[0]
+    batch = conn.calls[0]
+    assert len(batch) == 1
+    payload = batch[0] 
     assert payload["cv_id"] == 7
     assert payload["lang_id"] == 11
 
@@ -531,7 +528,7 @@ def test_upsert_sc_clearance(monkeypatch):
             "Email": ["a@example.com"],
             "Clearance": ["SC"],
             "Valid From": ["2024-01-02"],
-            "Valid To": ["2023-01-01"],  # will be dropped since < valid_from
+            "Valid To": ["2023-01-01"],  
             "Verified By": ["HR"],
             "Notes": ["note"],
         }
@@ -554,4 +551,9 @@ def test_upsert_availability_clamps(monkeypatch):
     )
     conn = FakeConn()
     load_mod.upsert_availability(conn, df)
-    assert len(conn.calls) == 2
+    assert len(conn.calls) == 1
+    batch = conn.calls[0]
+    assert len(batch) == 2  
+    assert batch[0]["percent_available"] == 100  
+    assert batch[1]["percent_available"] == 0    
+    assert batch[1]["source"] == "Fake generator" 

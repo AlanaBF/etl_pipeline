@@ -2,6 +2,7 @@ from pathlib import Path
 from unittest.mock import patch
 import pytest
 from sqlalchemy import create_engine, text
+from dotenv import load_dotenv
 
 from flowcase_etl_pipeline.config import DbConfig
 from flowcase_etl_pipeline.db import apply_sql_folder, create_database_if_missing
@@ -11,8 +12,12 @@ from flowcase_etl_pipeline.load import load
 
 @pytest.mark.integration
 def test_etl_end_to_end_with_qtest(tmp_path):
+    env_test_path = Path(__file__).parent.parent.parent / ".env.test"
+    load_dotenv(env_test_path)
+    
     with patch("flowcase_etl_pipeline.extract.find_latest_quarterly_report_folder") as mock_find:
-        mock_find.return_value = Path("flowcase_etl/cv_reports/QTEST")
+        qtest_path = Path("etl_pipeline/flowcase_etl/cv_reports/QTEST").resolve()
+        mock_find.return_value = qtest_path
         try:
             cfg = DbConfig.from_env()
         except ValueError as exc:
@@ -27,11 +32,10 @@ def test_etl_end_to_end_with_qtest(tmp_path):
         apply_sql_folder(engine, sql_dir_main)
         apply_sql_folder(engine, sql_dir_tests)
 
-        result = extract({"base_folder": "flowcase_etl/cv_reports/QTEST", "data_source": "fake"})
+        result = extract({"base_folder": "etl_pipeline/flowcase_etl/cv_reports", "data_source": "fake"})
         tr = transform(result.frames)
         load(tr, engine)
 
-        # Refresh the QTEST materialized view
         with engine.begin() as conn:
             conn.execute(text("REFRESH MATERIALIZED VIEW cv_search_profile_qtest_mv"))
 

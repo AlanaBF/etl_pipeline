@@ -177,16 +177,24 @@ Additional:
 
 To run all unit and integration tests with coverage and HTML reports, use the following commands from the repository root:
 
+**For bash/Linux/macOS:**
 ```bash
 # Load test environment variables
-set -a && source flowcase_etl/.env.test && set +a
+set -a && source etl_pipeline/flowcase_etl/.env.test && set +a
 
 # Run tests with coverage and reports
-PYTHONPATH=flowcase_etl/src .venv/bin/pytest flowcase_etl/src/tests \
+PYTHONPATH=etl_pipeline/flowcase_etl/src .venv/bin/pytest etl_pipeline/flowcase_etl/src/tests \
   --junitxml=reports/junit.xml --html=reports/report.html \
-  --cov=flowcase_etl --cov-report=term-missing \
+  --cov=flowcase_etl_pipeline --cov-report=term-missing \
   --cov-report=html:reports/coverage_html \
   --cov-report=xml:reports/coverage.xml
+```
+
+**For Windows PowerShell:**
+```powershell
+# Set environment variable and run tests
+$env:PYTHONPATH="etl_pipeline/flowcase_etl/src"
+.venv\Scripts\python -m pytest etl_pipeline\flowcase_etl\src\tests --junitxml=reports\junit.xml --html=reports\report.html --cov=flowcase_etl_pipeline --cov-report=term-missing --cov-report=html:reports\coverage_html --cov-report=xml:reports\coverage.xml
 ```
 
 - `.env.test` contains test-specific environment variables.
