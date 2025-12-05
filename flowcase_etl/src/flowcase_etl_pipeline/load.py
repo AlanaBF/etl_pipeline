@@ -14,6 +14,30 @@ from sqlalchemy import text
 from sqlalchemy.engine import Engine
 import logging
 
+from .constants import (
+    CV_PARTNER_USER_ID, CV_PARTNER_CV_ID, CV_PARTNER_SECTION_ID,
+    NAME_MULTILANG, EMAIL, UPN, EXTERNAL_USER_ID, PHONE_NUMBER,
+    LANDLINE, BIRTH_YEAR, DEPARTMENT, COUNTRY, USER_CREATED_AT,
+    YEARS_OF_EDUCATION, YEARS_SINCE_FIRST_WORK_EXPERIENCE, HAS_PROFILE_IMAGE,
+    OWNS_A_REFERENCE_PROJECT, READ_AND_UNDERSTOOD_PRIVACY_NOTICE,
+    CV_LAST_UPDATED_BY_OWNER, CV_LAST_UPDATED, EXTERNAL_UNIQUE_ID,
+    MONTH_FROM, YEAR_FROM, MONTH_TO, YEAR_TO, MONTH, YEAR,
+    MONTH_EXPIRE, YEAR_EXPIRE, HIGHLIGHTED, NAME, DESCRIPTION,
+    LONG_DESCRIPTION, UPDATED, UPDATED_BY_OWNER, EMPLOYER,
+    ATTACHMENTS, PLACE_OF_STUDY, DEGREE, ORGANISER, LABEL,
+    SUMMARY_OF_QUALIFICATIONS, SHORT_DESCRIPTION, SKILL_NAME,
+    YEAR_EXPERIENCE, PROFICIENCY_0_5, LANGUAGE, LEVEL,
+    CUSTOMER_INT, CUSTOMER_MULTILANG, CUSTOMER_ANONYMOUS_INT,
+    CUSTOMER_ANONYMOUS_MULTILANG, DESCRIPTION_INT, DESCRIPTION_MULTILANG,
+    LONG_DESCRIPTION_INT, LONG_DESCRIPTION_MULTILANG, INDUSTRY,
+    PROJECT_TYPE, PERCENT_ALLOCATED, EXTENT_INDIVIDUAL_HOURS,
+    EXTENT_HOURS, EXTENT_TOTAL_HOURS, EXTENT_UNIT, EXTENT_CURRENCY,
+    EXTENT_TOTAL, EXTENT_TOTAL_CURRENCY, PROJECT_AREA, PROJECT_AREA_UNIT,
+    CLEARANCE, VALID_FROM, VALID_TO, VERIFIED_BY, NOTES, DATE,
+    PERCENT_AVAILABLE, SOURCE, IS_OFFICIAL_MASTERDATA, DEFAULT_SOURCE,
+    DEFAULT_CLEARANCE, DEFAULT_DATE, NAME_FIELD
+)
+
 logger = logging.getLogger(__name__)
 
 def _to_bool(value):
@@ -65,7 +89,7 @@ def _cv_id(conn, cv_partner_cv_id: str):
     ).scalar()
 
 
-def _ensure_dim(conn, table: str, name: Optional[str], key: str = "name", id_col: str = None):
+def _ensure_dim(conn, table: str, name: Optional[str], key: str = NAME_FIELD, id_col: str = None):
     if not name:
         return None
     if id_col is None:
@@ -109,17 +133,17 @@ def upsert_users(conn, df: pd.DataFrame):
     for _, row in df.iterrows():
         payload.append(
             {
-                "cv_partner_user_id": str(row["CV Partner User ID"]),
-                "name_multilang": json.dumps(row["Name (multilang)"]),
-                "email": row.get("Email"),
-                "upn": row.get("UPN"),
-                "external_user_id": row.get("External User ID"),
-                "phone_number": row.get("Phone Number"),
-                "landline": row.get("Landline"),
-                "birth_year": int(row["Birth Year"]) if pd.notna(row.get("Birth Year")) else None,
-                "department": row.get("Department"),
-                "country": row.get("Country"),
-                "user_created_at": row.get("User created at"),
+                "cv_partner_user_id": str(row[CV_PARTNER_USER_ID]),
+                "name_multilang": json.dumps(row[NAME_MULTILANG]),
+                "email": row.get(EMAIL),
+                "upn": row.get(UPN),
+                "external_user_id": row.get(EXTERNAL_USER_ID),
+                "phone_number": row.get(PHONE_NUMBER),
+                "landline": row.get(LANDLINE),
+                "birth_year": int(row[BIRTH_YEAR]) if pd.notna(row.get(BIRTH_YEAR)) else None,
+                "department": row.get(DEPARTMENT),
+                "country": row.get(COUNTRY),
+                "user_created_at": row.get(USER_CREATED_AT),
                 "nationality_multilang": json.dumps(row.get("nationality_multilang", {})),
             },
         )
@@ -162,24 +186,24 @@ def upsert_cvs(conn, df: pd.DataFrame):
     for _, row in df.iterrows():
         uid = conn.execute(
             text("SELECT user_id FROM users WHERE cv_partner_user_id=:uid"),
-            {"uid": str(row["CV Partner User ID"])},
+            {"uid": str(row[CV_PARTNER_USER_ID])},
         ).scalar()
         if uid is None:
-            logger.warning(f"Skipping CV {row['CV Partner CV ID']} (unknown user {row['CV Partner User ID']})")
+            logger.warning(f"Skipping CV {row[CV_PARTNER_CV_ID]} (unknown user {row[CV_PARTNER_USER_ID]})")
             continue
 
         payload.append(
             {
-                "cv_partner_cv_id": str(row["CV Partner CV ID"]),
+                "cv_partner_cv_id": str(row[CV_PARTNER_CV_ID]),
                 "user_id": uid,
                 "title_multilang": json.dumps(row["title_multilang"]),
-                "yoe": int(row["Years of education"]) if pd.notna(row["Years of education"]) else None,
-                "ysfwe": int(row["Years since first work experience"]) if pd.notna(row["Years since first work experience"]) else None,
-                "has_img": _to_bool(row["Has profile image"]),
-                "owns_ref": _to_bool(row["Owns a reference project"]),
-                "read_priv": _to_bool(row["Read and understood privacy notice"]),
-                "lu_owner": row["CV Last updated by owner"],
-                "lu": row["CV Last updated"],
+                "yoe": int(row[YEARS_OF_EDUCATION]) if pd.notna(row[YEARS_OF_EDUCATION]) else None,
+                "ysfwe": int(row[YEARS_SINCE_FIRST_WORK_EXPERIENCE]) if pd.notna(row[YEARS_SINCE_FIRST_WORK_EXPERIENCE]) else None,
+                "has_img": _to_bool(row[HAS_PROFILE_IMAGE]),
+                "owns_ref": _to_bool(row[OWNS_A_REFERENCE_PROJECT]),
+                "read_priv": _to_bool(row[READ_AND_UNDERSTOOD_PRIVACY_NOTICE]),
+                "lu_owner": row[CV_LAST_UPDATED_BY_OWNER],
+                "lu": row[CV_LAST_UPDATED],
                 "sfia_level": row.get("sfia_level"),
                 "cpd_level": row.get("cpd_level"),
                 "cpd_band": None if pd.isna(row.get("cpd_band")) else str(row.get("cpd_band")),
@@ -229,7 +253,7 @@ def upsert_technologies(conn, df: pd.DataFrame):
     link_payload = []
 
     for _, row in df.iterrows():
-        tech_name = row["Skill name"]
+        tech_name = row[SKILL_NAME]
 
         conn.execute(insert_dim_sql, {"name": tech_name})
 
@@ -244,20 +268,20 @@ def upsert_technologies(conn, df: pd.DataFrame):
 
         cv_id = conn.execute(
             text("SELECT cv_id FROM cvs WHERE cv_partner_cv_id = :cid"),
-            {"cid": str(row["CV Partner CV ID"])},
+            {"cid": str(row[CV_PARTNER_CV_ID])},
         ).scalar()
 
         if cv_id is None:
-            logger.warning(f"Skipping tech link; unknown CV {row['CV Partner CV ID']}")
+            logger.warning(f"Skipping tech link; unknown CV {row[CV_PARTNER_CV_ID]}")
             continue
 
         link_payload.append(
             {
                 "cv": cv_id,
                 "tech": tech_id,
-                "yexp": int(row["Year experience"]) if pd.notna(row["Year experience"]) else None,
-                "prof": int(row["Proficiency (0-5)"]) if pd.notna(row["Proficiency (0-5)"]) else None,
-                "is_md": json.dumps(row["Is official masterdata (in #{lang})"]),
+                "yexp": int(row[YEAR_EXPERIENCE]) if pd.notna(row[YEAR_EXPERIENCE]) else None,
+                "prof": int(row[PROFICIENCY_0_5]) if pd.notna(row[PROFICIENCY_0_5]) else None,
+                "is_md": json.dumps(row[IS_OFFICIAL_MASTERDATA]),
             }
         )
 
@@ -284,19 +308,19 @@ def upsert_languages(conn, df: pd.DataFrame):
     )
     payload = []
     for _, row in df.iterrows():
-        cv_id = _cv_id(conn, row["CV Partner CV ID"])
+        cv_id = _cv_id(conn, row[CV_PARTNER_CV_ID])
         if not cv_id:
             continue
-        lang_id = _ensure_dim(conn, "dim_language", row.get("Language"))
+        lang_id = _ensure_dim(conn, "dim_language", row.get(LANGUAGE))
         payload.append(
             {
                 "cv_id": cv_id,
                 "lang_id": lang_id,
-                "level": row.get("Level"),
-                "highlighted": _to_bool(row.get("Highlighted")),
-                "is_md": json.dumps(row.get("Is official masterdata (in #{lang})", {})),
-                "updated": row.get("Updated"),
-                "updated_by_owner": row.get("Updated by owner"),
+                "level": row.get(LEVEL),
+                "highlighted": _to_bool(row.get(HIGHLIGHTED)),
+                "is_md": json.dumps(row.get(IS_OFFICIAL_MASTERDATA, {})),
+                "updated": row.get(UPDATED),
+                "updated_by_owner": row.get(UPDATED_BY_OWNER),
             },
         )
     if payload:
@@ -353,41 +377,41 @@ def upsert_project_experiences(conn, df: pd.DataFrame):
     )
     payload = []
     for _, row in df.iterrows():
-        cv_id = _cv_id(conn, row["CV Partner CV ID"])
+        cv_id = _cv_id(conn, row[CV_PARTNER_CV_ID])
         if not cv_id:
             continue
         payload.append(
             {
                 "cv_id": cv_id,
-                "sid": row.get("CV Partner section ID"),
-                "ext_id": row.get("External unique ID"),
-                "m_from": row.get("Month from"),
-                "y_from": row.get("Year from"),
-                "m_to": row.get("Month to"),
-                "y_to": row.get("Year to"),
-                "cust_int": row.get("Customer (int)"),
-                "cust_ml": json.dumps(row.get("Customer (#{lang})", {})),
-                "cust_anon_int": row.get("Customer anonymous (int)"),
-                "cust_anon_ml": json.dumps(row.get("Customer anonymous (#{lang})", {})),
-                "desc_int": row.get("Description (int)"),
-                "desc_ml": json.dumps(row.get("Description (#{lang})", {})),
-                "ldesc_int": row.get("Long description (int)"),
-                "ldesc_ml": json.dumps(row.get("Long description (#{lang})", {})),
-                "industry_id": _ensure_dim(conn, "dim_industry", row.get("Industry")),
-                "project_type_id": _ensure_dim(conn, "dim_project_type", row.get("Project type")),
-                "pct_alloc": row.get("Percent allocated"),
-                "indiv_hours": row.get("Extent individual hours"),
-                "hours": row.get("Extent hours"),
-                "total_hours": row.get("Extent total hours"),
-                "extent_unit": row.get("Extent unit"),
-                "extent_curr": row.get("Extent currency"),
-                "extent_total": row.get("Extent total"),
-                "extent_total_curr": row.get("Extent total currency"),
-                "proj_area": row.get("Project area"),
-                "proj_area_unit": row.get("Project area unit"),
-                "highlighted": _to_bool(row.get("Highlighted")),
-                "updated": row.get("Updated"),
-                "updated_by_owner": row.get("Updated by owner"),
+                "sid": row.get(CV_PARTNER_SECTION_ID),
+                "ext_id": row.get(EXTERNAL_UNIQUE_ID),
+                "m_from": row.get(MONTH_FROM),
+                "y_from": row.get(YEAR_FROM),
+                "m_to": row.get(MONTH_TO),
+                "y_to": row.get(YEAR_TO),
+                "cust_int": row.get(CUSTOMER_INT),
+                "cust_ml": json.dumps(row.get(CUSTOMER_MULTILANG, {})),
+                "cust_anon_int": row.get(CUSTOMER_ANONYMOUS_INT),
+                "cust_anon_ml": json.dumps(row.get(CUSTOMER_ANONYMOUS_MULTILANG, {})),
+                "desc_int": row.get(DESCRIPTION_INT),
+                "desc_ml": json.dumps(row.get(DESCRIPTION_MULTILANG, {})),
+                "ldesc_int": row.get(LONG_DESCRIPTION_INT),
+                "ldesc_ml": json.dumps(row.get(LONG_DESCRIPTION_MULTILANG, {})),
+                "industry_id": _ensure_dim(conn, "dim_industry", row.get(INDUSTRY)),
+                "project_type_id": _ensure_dim(conn, "dim_project_type", row.get(PROJECT_TYPE)),
+                "pct_alloc": row.get(PERCENT_ALLOCATED),
+                "indiv_hours": row.get(EXTENT_INDIVIDUAL_HOURS),
+                "hours": row.get(EXTENT_HOURS),
+                "total_hours": row.get(EXTENT_TOTAL_HOURS),
+                "extent_unit": row.get(EXTENT_UNIT),
+                "extent_curr": row.get(EXTENT_CURRENCY),
+                "extent_total": row.get(EXTENT_TOTAL),
+                "extent_total_curr": row.get(EXTENT_TOTAL_CURRENCY),
+                "proj_area": row.get(PROJECT_AREA),
+                "proj_area_unit": row.get(PROJECT_AREA_UNIT),
+                "highlighted": _to_bool(row.get(HIGHLIGHTED)),
+                "updated": row.get(UPDATED),
+                "updated_by_owner": row.get(UPDATED_BY_OWNER),
             },
         )
     if payload:
@@ -423,32 +447,32 @@ def upsert_section_table(conn, df: pd.DataFrame, table: str, fields: dict):
 
 def upsert_work_experiences(conn, df: pd.DataFrame):
     fields = {
-        "cv_partner_section_id": "CV Partner section ID",
-        "external_unique_id": "External unique ID",
-        "month_from": "Month from",
-        "year_from": "Year from",
-        "month_to": "Month to",
-        "year_to": "Year to",
-        "highlighted": "Highlighted",
-        "employer": "Employer",
-        "description": "Description",
-        "long_description": "Long description",
-        "updated": "Updated",
-        "updated_by_owner": "Updated by owner",
+        "cv_partner_section_id": CV_PARTNER_SECTION_ID,
+        "external_unique_id": EXTERNAL_UNIQUE_ID,
+        "month_from": MONTH_FROM,
+        "year_from": YEAR_FROM,
+        "month_to": MONTH_TO,
+        "year_to": YEAR_TO,
+        "highlighted": HIGHLIGHTED,
+        "employer": EMPLOYER,
+        "description": DESCRIPTION,
+        "long_description": LONG_DESCRIPTION,
+        "updated": UPDATED,
+        "updated_by_owner": UPDATED_BY_OWNER,
     }
     upsert_section_table(conn, df, "work_experience", fields)
 
 
 def upsert_certifications(conn, df: pd.DataFrame):
     fields = {
-        "cv_partner_section_id": "CV Partner section ID",
-        "external_unique_id": "External unique ID",
-        "month": "Month",
-        "year": "Year",
-        "month_expire": "Month expire",
-        "year_expire": "Year expire",
-        "updated": "Updated",
-        "updated_by_owner": "Updated by owner",
+        "cv_partner_section_id": CV_PARTNER_SECTION_ID,
+        "external_unique_id": EXTERNAL_UNIQUE_ID,
+        "month": MONTH,
+        "year": YEAR,
+        "month_expire": MONTH_EXPIRE,
+        "year_expire": YEAR_EXPIRE,
+        "updated": UPDATED,
+        "updated_by_owner": UPDATED_BY_OWNER,
     }
     upsert_section_table(conn, df, "certification", fields)
 
@@ -485,24 +509,24 @@ def upsert_courses(conn, df: pd.DataFrame):
     )
     payload = []
     for _, row in df.iterrows():
-        cv_id = _cv_id(conn, row["CV Partner CV ID"])
+        cv_id = _cv_id(conn, row[CV_PARTNER_CV_ID])
         if cv_id is None:
             continue
         payload.append(
             {
                 "cv_id": cv_id,
-                "cv_partner_section_id": row.get("CV Partner section ID"),
-                "external_unique_id": row.get("External unique ID"),
-                "month": row.get("Month"),
-                "year": row.get("Year"),
-                "name": row.get("Name"),
-                "organiser": row.get("Organiser"),
-                "long_description": row.get("Long description"),
-                "highlighted": _to_bool(row.get("Highlighted")),
-                "is_official_masterdata": json.dumps(row.get("Is official masterdata (in #{lang})", {})),
-                "attachments": _clean_str(row.get("Attachments"), None),
-                "updated": row.get("Updated"),
-                "updated_by_owner": row.get("Updated by owner"),
+                "cv_partner_section_id": row.get(CV_PARTNER_SECTION_ID),
+                "external_unique_id": row.get(EXTERNAL_UNIQUE_ID),
+                "month": row.get(MONTH),
+                "year": row.get(YEAR),
+                "name": row.get(NAME),
+                "organiser": row.get(ORGANISER),
+                "long_description": row.get(LONG_DESCRIPTION),
+                "highlighted": _to_bool(row.get(HIGHLIGHTED)),
+                "is_official_masterdata": json.dumps(row.get(IS_OFFICIAL_MASTERDATA, {})),
+                "attachments": _clean_str(row.get(ATTACHMENTS), None),
+                "updated": row.get(UPDATED),
+                "updated_by_owner": row.get(UPDATED_BY_OWNER),
             }
         )
     if payload:
@@ -511,71 +535,71 @@ def upsert_courses(conn, df: pd.DataFrame):
 
 def upsert_educations(conn, df: pd.DataFrame):
     fields = {
-        "cv_partner_section_id": "CV Partner section ID",
-        "external_unique_id": "External unique ID",
-        "month_from": "Month from",
-        "year_from": "Year from",
-        "month_to": "Month to",
-        "year_to": "Year to",
-        "highlighted": "Highlighted",
-        "attachments": "Attachments",
-        "place_of_study": "Place of study",
-        "degree": "Degree",
-        "description": "Description",
-        "updated": "Updated",
-        "updated_by_owner": "Updated by owner",
+        "cv_partner_section_id": CV_PARTNER_SECTION_ID,
+        "external_unique_id": EXTERNAL_UNIQUE_ID,
+        "month_from": MONTH_FROM,
+        "year_from": YEAR_FROM,
+        "month_to": MONTH_TO,
+        "year_to": YEAR_TO,
+        "highlighted": HIGHLIGHTED,
+        "attachments": ATTACHMENTS,
+        "place_of_study": PLACE_OF_STUDY,
+        "degree": DEGREE,
+        "description": DESCRIPTION,
+        "updated": UPDATED,
+        "updated_by_owner": UPDATED_BY_OWNER,
     }
     upsert_section_table(conn, df, "education", fields)
 
 
 def upsert_positions(conn, df: pd.DataFrame):
     fields = {
-        "cv_partner_section_id": "CV Partner section ID",
-        "external_unique_id": "External unique ID",
-        "year_from": "Year from",
-        "year_to": "Year to",
-        "highlighted": "Highlighted",
-        "name": "Name",
-        "description": "Description",
-        "updated": "Updated",
-        "updated_by_owner": "Updated by owner",
+        "cv_partner_section_id": CV_PARTNER_SECTION_ID,
+        "external_unique_id": EXTERNAL_UNIQUE_ID,
+        "year_from": YEAR_FROM,
+        "year_to": YEAR_TO,
+        "highlighted": HIGHLIGHTED,
+        "name": NAME,
+        "description": DESCRIPTION,
+        "updated": UPDATED,
+        "updated_by_owner": UPDATED_BY_OWNER,
     }
     upsert_section_table(conn, df, "position", fields)
 
 
 def upsert_blogs(conn, df: pd.DataFrame):
     fields = {
-        "cv_partner_section_id": "CV Partner section ID",
-        "external_unique_id": "External unique ID",
-        "name": "Name",
-        "description": "Description",
-        "highlighted": "Highlighted",
-        "updated": "Updated",
-        "updated_by_owner": "Updated by owner",
+        "cv_partner_section_id": CV_PARTNER_SECTION_ID,
+        "external_unique_id": EXTERNAL_UNIQUE_ID,
+        "name": NAME,
+        "description": DESCRIPTION,
+        "highlighted": HIGHLIGHTED,
+        "updated": UPDATED,
+        "updated_by_owner": UPDATED_BY_OWNER,
     }
     upsert_section_table(conn, df, "blog_publication", fields)
 
 
 def upsert_cv_roles(conn, df: pd.DataFrame):
     fields = {
-        "name": "Name",
-        "description": "Description",
-        "highlighted": "Highlighted",
-        "updated": "Updated",
-        "updated_by_owner": "Updated by owner",
+        "name": NAME,
+        "description": DESCRIPTION,
+        "highlighted": HIGHLIGHTED,
+        "updated": UPDATED,
+        "updated_by_owner": UPDATED_BY_OWNER,
     }
     upsert_section_table(conn, df, "cv_role", fields)
 
 
 def upsert_key_qualifications(conn, df: pd.DataFrame):
     fields = {
-        "cv_partner_section_id": "CV Partner section ID",
-        "external_unique_id": "External unique ID",
-        "label": "Label",
-        "summary": "Summary of Qualifications",
-        "short_description": "Short description",
-        "updated": "Updated",
-        "updated_by_owner": "Updated by owner",
+        "cv_partner_section_id": CV_PARTNER_SECTION_ID,
+        "external_unique_id": EXTERNAL_UNIQUE_ID,
+        "label": LABEL,
+        "summary": SUMMARY_OF_QUALIFICATIONS,
+        "short_description": SHORT_DESCRIPTION,
+        "updated": UPDATED,
+        "updated_by_owner": UPDATED_BY_OWNER,
     }
     upsert_section_table(conn, df, "key_qualification", fields)
 
@@ -596,20 +620,20 @@ def upsert_sc_clearance(conn, df: pd.DataFrame):
     )
     payload = []
     for _, row in df.iterrows():
-        uid = _resolve_user_id(conn, row.get("Email"), row.get("UPN"), row.get("External User ID"))
+        uid = _resolve_user_id(conn, row.get(EMAIL), row.get(UPN), row.get(EXTERNAL_USER_ID))
         if not uid:
             continue
 
-        clearance_name = _clean_str(row.get("Clearance"), "None") or "None"
+        clearance_name = _clean_str(row.get(CLEARANCE), DEFAULT_CLEARANCE) or DEFAULT_CLEARANCE
         conn.execute(text("INSERT INTO dim_clearance(name) VALUES (:n) ON CONFLICT(name) DO NOTHING"), {"n": clearance_name})
         clearance_id = conn.execute(
             text("SELECT clearance_id FROM dim_clearance WHERE name=:n"), {"n": clearance_name}
         ).scalar()
 
-        valid_from_date = _to_date(row.get("Valid From"), default=_to_date("1900-01-01"))
-        valid_to_date = _to_date(row.get("Valid To"))
-        verified_by = _clean_str(row.get("Verified By"), None) or None
-        notes = _clean_str(row.get("Notes"), None) or None
+        valid_from_date = _to_date(row.get(VALID_FROM), default=_to_date(DEFAULT_DATE))
+        valid_to_date = _to_date(row.get(VALID_TO))
+        verified_by = _clean_str(row.get(VERIFIED_BY), None) or None
+        notes = _clean_str(row.get(NOTES), None) or None
 
         if valid_to_date and valid_from_date and valid_to_date < valid_from_date:
             valid_to_date = None
@@ -644,18 +668,18 @@ def upsert_availability(conn, df: pd.DataFrame):
     )
     payload = []
     for _, row in df.iterrows():
-        uid = _resolve_user_id(conn, row.get("Email"), row.get("UPN"), row.get("External User ID"))
+        uid = _resolve_user_id(conn, row.get(EMAIL), row.get(UPN), row.get(EXTERNAL_USER_ID))
         if not uid:
             continue
-        raw_percent = row.get("Percent Available")
+        raw_percent = row.get(PERCENT_AVAILABLE)
         percent = 0 if raw_percent is None or (isinstance(raw_percent, float) and pd.isna(raw_percent)) else int(float(raw_percent))
         percent = max(0, min(100, percent))
         payload.append(
             {
                 "user_id": uid,
-                "date": _clean_str(row.get("Date"), None) or None,
+                "date": _clean_str(row.get(DATE), None) or None,
                 "percent_available": percent,
-                "source": _clean_str(row.get("Source"), "Fake generator"),
+                "source": _clean_str(row.get(SOURCE), DEFAULT_SOURCE),
             },
         )
     if payload:

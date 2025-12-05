@@ -1,0 +1,117 @@
+"""
+Constants for the ETL pipeline.
+
+This file contains all string literals used throughout the pipeline
+to ensure consistency and ease of maintenance.
+"""
+
+# Column names from CV Partner data
+CV_PARTNER_USER_ID = "CV Partner User ID"
+CV_PARTNER_CV_ID = "CV Partner CV ID"
+CV_PARTNER_SECTION_ID = "CV Partner section ID"
+
+# User-related field names
+NAME_MULTILANG = "Name (multilang)"
+EMAIL = "Email"
+UPN = "UPN"
+EXTERNAL_USER_ID = "External User ID"
+PHONE_NUMBER = "Phone Number"
+LANDLINE = "Landline"
+BIRTH_YEAR = "Birth Year"
+DEPARTMENT = "Department"
+COUNTRY = "Country"
+USER_CREATED_AT = "User created at"
+
+# CV-related field names
+YEARS_OF_EDUCATION = "Years of education"
+YEARS_SINCE_FIRST_WORK_EXPERIENCE = "Years since first work experience"
+HAS_PROFILE_IMAGE = "Has profile image"
+OWNS_A_REFERENCE_PROJECT = "Owns a reference project"
+READ_AND_UNDERSTOOD_PRIVACY_NOTICE = "Read and understood privacy notice"
+CV_LAST_UPDATED_BY_OWNER = "CV Last updated by owner"
+CV_LAST_UPDATED = "CV Last updated"
+
+# Common section field names
+EXTERNAL_UNIQUE_ID = "External unique ID"
+MONTH_FROM = "Month from"
+YEAR_FROM = "Year from"
+MONTH_TO = "Month to"
+YEAR_TO = "Year to"
+MONTH = "Month"
+YEAR = "Year"
+MONTH_EXPIRE = "Month expire"
+YEAR_EXPIRE = "Year expire"
+HIGHLIGHTED = "Highlighted"
+NAME = "Name"
+DESCRIPTION = "Description"
+LONG_DESCRIPTION = "Long description"
+UPDATED = "Updated"
+UPDATED_BY_OWNER = "Updated by owner"
+
+# Work experience specific
+EMPLOYER = "Employer"
+
+# Education specific
+ATTACHMENTS = "Attachments"
+PLACE_OF_STUDY = "Place of study"
+DEGREE = "Degree"
+
+# Course specific
+ORGANISER = "Organiser"
+
+# Key qualifications specific
+LABEL = "Label"
+SUMMARY_OF_QUALIFICATIONS = "Summary of Qualifications"
+SHORT_DESCRIPTION = "Short description"
+
+# Technology related
+SKILL_NAME = "Skill name"
+YEAR_EXPERIENCE = "Year experience"
+PROFICIENCY_0_5 = "Proficiency (0-5)"
+
+# Language related
+LANGUAGE = "Language"
+LEVEL = "Level"
+
+# Project experience specific
+CUSTOMER_INT = "Customer (int)"
+CUSTOMER_MULTILANG = "Customer (#{lang})"
+CUSTOMER_ANONYMOUS_INT = "Customer anonymous (int)"
+CUSTOMER_ANONYMOUS_MULTILANG = "Customer anonymous (#{lang})"
+DESCRIPTION_INT = "Description (int)"
+DESCRIPTION_MULTILANG = "Description (#{lang})"
+LONG_DESCRIPTION_INT = "Long description (int)"
+LONG_DESCRIPTION_MULTILANG = "Long description (#{lang})"
+INDUSTRY = "Industry"
+PROJECT_TYPE = "Project type"
+PERCENT_ALLOCATED = "Percent allocated"
+EXTENT_INDIVIDUAL_HOURS = "Extent individual hours"
+EXTENT_HOURS = "Extent hours"
+EXTENT_TOTAL_HOURS = "Extent total hours"
+EXTENT_UNIT = "Extent unit"
+EXTENT_CURRENCY = "Extent currency"
+EXTENT_TOTAL = "Extent total"
+EXTENT_TOTAL_CURRENCY = "Extent total currency"
+PROJECT_AREA = "Project area"
+PROJECT_AREA_UNIT = "Project area unit"
+
+# Security clearance specific
+CLEARANCE = "Clearance"
+VALID_FROM = "Valid From"
+VALID_TO = "Valid To"
+VERIFIED_BY = "Verified By"
+NOTES = "Notes"
+
+# Availability specific
+DATE = "Date"
+PERCENT_AVAILABLE = "Percent Available"
+SOURCE = "Source"
+
+# Common values
+IS_OFFICIAL_MASTERDATA = "Is official masterdata (in #{lang})"
+DEFAULT_SOURCE = "Fake generator"
+DEFAULT_CLEARANCE = "None"
+DEFAULT_DATE = "1900-01-01"
+
+# Database field names (for consistency)
+NAME_FIELD = "name"
