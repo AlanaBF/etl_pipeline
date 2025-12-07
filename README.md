@@ -7,17 +7,17 @@ The pipeline extracts the latest quarterly export (Q####), transforms the raw fi
 
 ## Tech stack
 
-Developed in [![Visual Studio Code](https://custom-icon-badges.demolab.com/badge/Visual%20Studio%20Code-0078d7.svg?logo=vsc&logoColor=white)](#)
+Developed in [![Visual Studio Code](https://custom-icon-badges.demolab.com/badge/Visual%20Studio%20Code-0078d7.svg?logo=vsc&logoColor=white)](https://code.visualstudio.com/)
 
 Backend: Python 3.10+, SQLAlchemy
 
-[![ETL](https://custom-icon-badges.demolab.com/badge/ETL-9370DB?logo=etl-logo&logoColor=fff)](#)
-[![Python](https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=fff)](#)
-[![Jupyter](https://img.shields.io/badge/Jupyter-ffffff?logo=Jupyter)](#)
-[![Pandas](https://img.shields.io/badge/Pandas-150458?logo=pandas&logoColor=fff)](#)
+[![ETL](https://custom-icon-badges.demolab.com/badge/ETL-9370DB?logo=etl-logo&logoColor=fff)](https://en.wikipedia.org/wiki/Extract,_transform,_load)
+[![Python](https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=fff)](https://www.python.org/)
+[![Jupyter](https://img.shields.io/badge/Jupyter-ffffff?logo=Jupyter)](https://jupyter.org/)
+[![Pandas](https://img.shields.io/badge/Pandas-150458?logo=pandas&logoColor=fff)](https://pandas.pydata.org/)
 
-[![Apache Airflow](https://img.shields.io/badge/Apache%20Airflow-017CEE?logo=apacheairflow&logoColor=fff)](#)
-[![Pytest](https://img.shields.io/badge/Pytest-fff?logo=pytest&logoColor=000)](#)
+[![Apache Airflow](https://img.shields.io/badge/Apache%20Airflow-017CEE?logo=apacheairflow&logoColor=fff)](https://airflow.apache.org/)
+[![Pytest](https://img.shields.io/badge/Pytest-fff?logo=pytest&logoColor=000)](https://docs.pytest.org/)
 
 Database: PostgreSQL (12+)
 
@@ -99,21 +99,6 @@ pip check
 # run the ETL in fake-data mode (creates Q#### CSVs and runs pipeline)
 PYTHONPATH=flowcase_etl/src python -m flowcase_etl_pipeline.cli --generate-fake
 
-## Airflow automation (docker-compose)
-
-- Prereqs: Docker Desktop with the Compose plugin.
-- Pick an env file in `airflow/` (copy the one you need to `.env`):
-  - Local Postgres (in containers): `cp .env.local .env`
-  - Azure Postgres: `cp .env.azure .env`
-- Build and start:
-  - `cd airflow`
-  - `docker compose build`
-  - `docker compose up airflow-init`
-  - `docker compose up -d webserver scheduler`
-- Airflow UI: http://localhost:8080 (login from `.env`).
-- pgAdmin (local Postgres): host `localhost`, port `5434`, db `airflow`, user `airflow`, password `airflow`.
-- If a host port is already used, edit `postgres` → `ports` in `airflow/docker-compose.yaml` (e.g., `5435:5432`) and reconnect with that port.
-
 # on windows
 # `cd etl_pipeline`
 # `set PYTHONPATH=flowcase_etl/src`
@@ -193,6 +178,7 @@ Additional:
 To run all unit and integration tests with coverage and HTML reports, use the following commands from the repository root:
 
 **For bash/Linux/macOS:**
+
 ```bash
 # Load test environment variables
 set -a && source etl_pipeline/flowcase_etl/.env.test && set +a
@@ -206,6 +192,7 @@ PYTHONPATH=etl_pipeline/flowcase_etl/src .venv/bin/pytest etl_pipeline/flowcase_
 ```
 
 **For Windows PowerShell:**
+
 ```powershell
 # Set environment variable and run tests
 $env:PYTHONPATH="etl_pipeline/flowcase_etl/src"
@@ -221,7 +208,102 @@ $env:PYTHONPATH="etl_pipeline/flowcase_etl/src"
 
 - drop the latest `Q####` export into `cv_reports/` and run the CLI.
 
-### Automation - COMING SOON
+### Airflow automation (docker-compose)
+
+#### Prereqs
+
+- Docker Desktop installed.
+- Repo checked out; working dir: `ETL_pipeline/airflow`.
+
+#### 1 Environment
+
+- Create an env file in `airflow/`:
+  - Local Postgres (in containers): `cp .env.local .env`
+  - Azure Postgres: `cp .env.azure .env`
+
+```env
+AIRFLOW_UID=501
+
+# Database connection used by Airflow/ETL inside containers
+PGHOST=postgres
+PGPORT=5432
+PGDATABASE=airflow
+PGUSER=airflow
+PGPASSWORD=airflow
+FLOWCASE_DATA_SOURCE=fake
+
+# Airflow admin user
+AIRFLOW_ADMIN_USERNAME=admin
+AIRFLOW_ADMIN_PASSWORD=password
+AIRFLOW_ADMIN_EMAIL=admin@example.com
+
+# Security keys (generate once per machine; do NOT commit real values)
+# Run this locally and copy the outputs below:
+# python - <<'PY'
+# from cryptography.fernet import Fernet
+# import secrets
+# print("AIRFLOW__CORE__FERNET_KEY=" + Fernet.generate_key().decode())
+# print("AIRFLOW__WEBSERVER__SECRET_KEY=" + secrets.token_urlsafe(32))
+# PY
+AIRFLOW__CORE__FERNET_KEY=replace_me
+AIRFLOW__WEBSERVER__SECRET_KEY=replace_me
+```
+
+##### How to switch Airflow between local and Azure
+
+- In airflow/docker-compose.yaml, keep env_file: .env but swap the file:
+  - For local DB: cp airflow/.env.local airflow/.env
+  - For Azure: cp airflow/.env.azure airflow/.env
+
+#### 2 Build custom Airflow image with ETL dependencies
+
+```Dockerfile
+airflow/Dockerfile:FROM apache/airflow:2.11.0
+COPY ../flowcase_etl/requirements.txt /requirements.txt
+RUN pip install --no-cache-dir -r /requirements.txt \
+--constraint https://raw.githubusercontent.com/apache/airflow/constraints-2.11.0/constraints-3.11.txt
+```
+
+- `airflow/docker-compose.yaml` already set to build with:
+
+```yaml
+build:
+  context: ..
+  dockerfile: airflow/Dockerfile
+```
+
+and mounts `../flowcase_etl/src` and `../flowcase_etl/cv_reports`.
+
+#### 3 Ports
+
+- Postgres exposed on host port 5434 (`ports: ["5434:5432"]`).
+- Airflow UI on 8080.
+
+#### 4 Full flow
+
+```bash
+cd airflow
+cp .env.local .env # or cp .env.azure .env
+docker compose down -v       # wipe old DB/volumes
+docker compose build         # build image with ETL dependencies
+docker compose up airflow-init
+docker compose up -d
+```
+
+#### 5 Airflow UI
+
+- Open [http://localhost:8080](http://localhost:8080)
+- Login: username/password set in .env
+- Trigger DAG: `flowcase_etl_quarterly`
+
+#### 6 pgAdmin connection (host)
+
+- Host: `localhost`
+- Port: `5434`
+- DB: `airflow`
+- User: `airflow`
+- Password: `airflow`
+- Refresh Schemas → public → Tables
 
 ## Notes
 
