@@ -99,6 +99,21 @@ pip check
 # run the ETL in fake-data mode (creates Q#### CSVs and runs pipeline)
 PYTHONPATH=flowcase_etl/src python -m flowcase_etl_pipeline.cli --generate-fake
 
+## Airflow automation (docker-compose)
+
+- Prereqs: Docker Desktop with the Compose plugin.
+- Pick an env file in `airflow/` (copy the one you need to `.env`):
+  - Local Postgres (in containers): `cp .env.local .env`
+  - Azure Postgres: `cp .env.azure .env`
+- Build and start:
+  - `cd airflow`
+  - `docker compose build`
+  - `docker compose up airflow-init`
+  - `docker compose up -d webserver scheduler`
+- Airflow UI: http://localhost:8080 (login from `.env`).
+- pgAdmin (local Postgres): host `localhost`, port `5434`, db `airflow`, user `airflow`, password `airflow`.
+- If a host port is already used, edit `postgres` → `ports` in `airflow/docker-compose.yaml` (e.g., `5435:5432`) and reconnect with that port.
+
 # on windows
 # `cd etl_pipeline`
 # `set PYTHONPATH=flowcase_etl/src`

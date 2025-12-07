@@ -12,6 +12,7 @@ logs/
 .env
 *.egg-info/
 .env.test
+.env.local
 build/
 dist/
 .pytest_cache/
